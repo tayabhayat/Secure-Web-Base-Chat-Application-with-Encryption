@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encrypted Chat UI</title>
+<link rel="stylesheet" href="Style.css">
+<!-- CryptoJS for AES Encryption -->
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+
+  <div class="sidebar">
+    <h2>Chats</h2>
+    <div class="user active">User 1</div>
+    <div class="user">User 2</div>
+  </div>
+
+  <div class="chat-container">
+
+    <div class="chat-header">Encrypted Chat</div>
+
+    <div class="chat-box" id="chatBox"></div>
+
+    <div class="chat-input">
+      <input id="messageInput" type="text" placeholder="Type message...">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Socket.io -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+// ================= CONFIG =================
+const socket = io();
+const SECRET_KEY = "mysecretkey123"; // Pre-shared key
+
+// ================= ENCRYPTION =================
+function encryptMessage(message){
+  return CryptoJS.AES.encrypt(message, SECRET_KEY).toString();
+}
+
+function decryptMessage(cipher){
+  try{
+    const bytes = CryptoJS.AES.decrypt(cipher, SECRET_KEY);
+    return bytes.toString(CryptoJS.enc.Utf8) || "[Decryption Failed]";
+  } catch {
+    return "[Error Decrypting]";
+  }
+}
+
+// ================= SEND MESSAGE =================
+function sendMessage(){
+  const input = document.getElementById("messageInput");
+  const message = input.value;
+
+  if(!message.trim()) return;
+
+  const encrypted = encryptMessage(message);
+
+  // Show own message
+  addMessage(message, encrypted, "sent");
+
+  // Send encrypted to server
+  socket.emit("sendMessage", encrypted);
+
+  input.value = "";
+}
+
+// ================= RECEIVE MESSAGE =================
+socket.on("receiveMessage", (encrypted)=>{
+  const decrypted = decryptMessage(encrypted);
+  addMessage(decrypted, encrypted, "received");
+});
+
+// ================= UI FUNCTION =================
+function addMessage(text, cipher, type){
+  const chatBox = document.getElementById("chatBox");
+
+  const msg = document.createElement("div");
+  msg.className = "message " + type;
+
+  const plain = document.createElement("div");
+  plain.innerText = text;
+
+  const enc = document.createElement("div");
+  enc.className = "cipher";
+  enc.innerText = "🔒 " + cipher;
+
+  msg.appendChild(plain);
+  msg.appendChild(enc);
+
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+</script>
+
+</body>
+</html>
